@@ -2,7 +2,7 @@ export type User = {
   id: string
   email: string
   name: string
-  createdAt: string
+  createdAt: Date
 }
 
 export type AuthUser = {
@@ -11,80 +11,46 @@ export type AuthUser = {
   name: string
 }
 
-// Simple password hashing (in production, use bcrypt)
-function hashPassword(password: string): string {
-  // This is a simple hash - in production use bcrypt or similar
-  return btoa(password + 'salt123')
+export async function registerUser(email: string, password: string, name: string): Promise<{ success: boolean; user?: User; error?: string }> {
+  try {
+    const response = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password, name }),
+    })
+
+    const result = await response.json()
+    return result
+  } catch (error) {
+    console.error('Registration error:', error)
+    return { success: false, error: 'Registration failed' }
+  }
 }
 
-function verifyPassword(password: string, hash: string): boolean {
-  return hashPassword(password) === hash
-}
+export async function loginUser(email: string, password: string): Promise<{ success: boolean; user?: AuthUser; error?: string }> {
+  try {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    })
 
-export function registerUser(email: string, password: string, name: string): { success: boolean; user?: User; error?: string } {
-  if (typeof window === 'undefined') return { success: false, error: 'Server-side operation' }
-  
-  const users = getAllUsers()
-  
-  // Check if user already exists
-  if (users.find(u => u.email === email)) {
-    return { success: false, error: 'User already exists' }
+    const result = await response.json()
+    
+    if (result.success && result.user) {
+      // Store session in localStorage
+      localStorage.setItem('currentUser', JSON.stringify(result.user))
+    }
+    
+    return result
+  } catch (error) {
+    console.error('Login error:', error)
+    return { success: false, error: 'Login failed' }
   }
-  
-  const user: User = {
-    id: crypto.randomUUID(),
-    email,
-    name,
-    createdAt: new Date().toISOString()
-  }
-  
-  // Store user
-  const updatedUsers = [...users, user]
-  localStorage.setItem('users', JSON.stringify(updatedUsers))
-  
-  // Store password separately (hashed)
-  const passwords = getPasswords()
-  const hashedPassword = hashPassword(password)
-  passwords[user.id] = hashedPassword
-  localStorage.setItem('passwords', JSON.stringify(passwords))
-  
-  console.log('User registered:', { userId: user.id, email, hashedPassword })
-  
-  return { success: true, user }
-}
-
-export function loginUser(email: string, password: string): { success: boolean; user?: AuthUser; error?: string } {
-  if (typeof window === 'undefined') return { success: false, error: 'Server-side operation' }
-  
-  const users = getAllUsers()
-  const user = users.find(u => u.email === email)
-  
-  if (!user) {
-    console.log('User not found:', email)
-    return { success: false, error: 'User not found' }
-  }
-  
-  const passwords = getPasswords()
-  const storedHash = passwords[user.id]
-  
-  console.log('Login attempt:', { email, userId: user.id, hasStoredHash: !!storedHash })
-  
-  if (!storedHash || !verifyPassword(password, storedHash)) {
-    console.log('Password verification failed')
-    return { success: false, error: 'Invalid password' }
-  }
-  
-  const authUser: AuthUser = {
-    id: user.id,
-    email: user.email,
-    name: user.name
-  }
-  
-  // Set current user session
-  localStorage.setItem('currentUser', JSON.stringify(authUser))
-  console.log('Login successful, user stored:', authUser)
-  
-  return { success: true, user: authUser }
 }
 
 export function logoutUser(): void {
@@ -98,14 +64,25 @@ export function getCurrentUser(): AuthUser | null {
   return stored ? JSON.parse(stored) : null
 }
 
-export function getAllUsers(): User[] {
-  if (typeof window === 'undefined') return []
-  const raw = localStorage.getItem('users')
-  return raw ? JSON.parse(raw) : []
-}
+export async function getUserByEmail(email: string): Promise<User | null> {
+  try {
+    const response = await fetch('/api/users/by-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email }),
+    })
 
-function getPasswords(): Record<string, string> {
-  if (typeof window === 'undefined') return {}
-  const raw = localStorage.getItem('passwords')
-  return raw ? JSON.parse(raw) : {}
+    const result = await response.json()
+    
+    if (result.success) {
+      return result.user
+    }
+    
+    return null
+  } catch (error) {
+    console.error('Error fetching user by email:', error)
+    return null
+  }
 }

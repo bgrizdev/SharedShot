@@ -1,0 +1,31 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:16
+    container_name: sharedshot-postgres
+    environment:
+      POSTGRES_USER: sharedshot
+      POSTGRES_PASSWORD: sharedshot_pass
+      POSTGRES_DB: sharedshot_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sharedshot -d sharedshot_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: sharedshot-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@default.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+volumes:
+  pgdata:

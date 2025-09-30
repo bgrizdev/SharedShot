@@ -9,12 +9,16 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@prisma/client": "^6.16.2",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-slot": "^1.2.3",
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.539.0",
     "next": "15.4.6",
+    "prisma": "^6.16.2",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "sharp": "^0.34.3",

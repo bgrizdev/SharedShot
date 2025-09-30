@@ -51,14 +51,18 @@ export default function RegisterPage() {
       return
     }
 
-    const result = registerUser(formData.email, formData.password, formData.name)
-    
-    if (result.success) {
-      router.push('/login?message=Registration successful! Please log in.')
-    } else {
-      setError(result.error || 'Registration failed')
+    try {
+      const result = await registerUser(formData.email, formData.password, formData.name)
+
+      if (result.success) {
+        router.push('/login?message=Registration successful! Please log in.')
+      } else {
+        setError(result.error || 'Registration failed')
+      }
+    } catch (error) {
+      setError('Registration failed. Please try again.')
     }
-    
+
     setLoading(false)
   }
 
@@ -128,8 +132,8 @@ export default function RegisterPage() {
           </div>
         )}
 
-        <Button 
-          type="submit" 
+        <Button
+          type="submit"
           className="w-full"
           disabled={loading}
         >

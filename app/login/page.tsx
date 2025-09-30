@@ -47,15 +47,19 @@ export default function LoginPage() {
       return
     }
 
-    const result = loginUser(formData.email, formData.password)
-    
-    if (result.success) {
-      // Refresh the auth context to update the user state
-      refreshUser()
-      // Force a page reload to ensure the auth state is properly updated
-      window.location.href = '/events'
-    } else {
-      setError(result.error || 'Login failed')
+    try {
+      const result = await loginUser(formData.email, formData.password)
+      
+      if (result.success) {
+        // Refresh the auth context to update the user state
+        refreshUser()
+        // Force a page reload to ensure the auth state is properly updated
+        window.location.href = '/events'
+      } else {
+        setError(result.error || 'Login failed')
+      }
+    } catch (error) {
+      setError('Login failed. Please try again.')
     }
     
     setLoading(false)

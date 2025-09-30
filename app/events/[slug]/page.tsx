@@ -21,23 +21,15 @@ function EventContent() {
   const { user } = useAuth()
 
   useEffect(() => {
-    const slug = params?.slug?.toString()
-    if (slug) {
-      const found = getEventBySlug(slug)
-      // Add backward compatibility for events without new fields
-      if (found) {
-        const eventWithDefaults = {
-          ...found,
-          ownerId: found.ownerId || '',
-          collaborators: found.collaborators || [],
-          createdAt: found.createdAt || new Date().toISOString(),
-          isPublic: found.isPublic !== undefined ? found.isPublic : true
-        }
-        setEvent(eventWithDefaults)
-      } else {
-        setEvent(null)
+    const fetchEvent = async () => {
+      const slug = params?.slug?.toString()
+      if (slug) {
+        const found = await getEventBySlug(slug)
+        setEvent(found)
       }
     }
+    
+    fetchEvent()
   }, [params])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,12 +59,12 @@ function EventContent() {
       if (response.ok) {
         const result = await response.json()
 
-        // Update local storage with all uploaded images
-        addImagesToEvent(event.slug, result.imageUrls)
+        // Update database with all uploaded images
+        await addImagesToEvent(event.slug, result.imageUrls)
 
         // Refresh event data
-        const updatedEvent = getEventBySlug(event.slug)
-        setEvent(updatedEvent ?? null)
+        const updatedEvent = await getEventBySlug(event.slug)
+        setEvent(updatedEvent)
 
         // Reset form
         setSelectedFiles(null)
@@ -102,12 +94,12 @@ function EventContent() {
       })
 
       if (response.ok) {
-        // Remove from local storage only if file deletion succeeded
-        removeImageFromEvent(event.slug, imageUrl)
+        // Remove from database only if file deletion succeeded
+        await removeImageFromEvent(event.slug, imageUrl)
 
         // Refresh event data
-        const updatedEvent = getEventBySlug(event.slug)
-        setEvent(updatedEvent ?? null)
+        const updatedEvent = await getEventBySlug(event.slug)
+        setEvent(updatedEvent)
       } else {
         console.error('Failed to delete file from server')
       }
@@ -117,26 +109,22 @@ function EventContent() {
   }
 
   const handleInviteUser = async () => {
-    if (!event || !inviteEmail.trim()) return
+    if (!event || !inviteEmail.trim() || !user) return
 
-    const result = addCollaboratorToEvent(event.slug, inviteEmail.trim())
-    
-    if (result.success) {
-      setInviteMessage('User invited successfully!')
-      setInviteEmail('')
-      // Refresh event data
-      const updatedEvent = getEventBySlug(event.slug)
-      if (updatedEvent) {
-        setEvent({
-          ...updatedEvent,
-          ownerId: updatedEvent.ownerId || '',
-          collaborators: updatedEvent.collaborators || [],
-          createdAt: updatedEvent.createdAt || new Date().toISOString(),
-          isPublic: updatedEvent.isPublic !== undefined ? updatedEvent.isPublic : true
-        })
+    try {
+      const result = await addCollaboratorToEvent(event.slug, inviteEmail.trim(), user.id)
+      
+      if (result.success) {
+        setInviteMessage('User invited successfully!')
+        setInviteEmail('')
+        // Refresh event data
+        const updatedEvent = await getEventBySlug(event.slug)
+        setEvent(updatedEvent)
+      } else {
+        setInviteMessage(result.error || 'Failed to invite user')
       }
-    } else {
-      setInviteMessage(result.error || 'Failed to invite user')
+    } catch (error) {
+      setInviteMessage('Failed to invite user')
     }
     
     setTimeout(() => setInviteMessage(''), 3000)
@@ -277,16 +265,16 @@ function EventContent() {
           <p className="text-gray-500">No images uploaded yet.</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {event.images.map((imageUrl, index) => (
-              <div key={index} className="relative aspect-square overflow-hidden rounded-lg border group">
+            {event.images.map((image, index) => (
+              <div key={image.id} className="relative aspect-square overflow-hidden rounded-lg border group">
                 <img
-                  src={imageUrl}
+                  src={image.url}
                   alt={`Event image ${index + 1}`}
                   className="w-full h-full object-cover hover:scale-105 transition-transform"
                 />
                 {canEdit && (
                   <button
-                    onClick={() => handleDeleteImage(imageUrl)}
+                    onClick={() => handleDeleteImage(image.url)}
                     className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-lg"
                     aria-label="Delete image"
                   >

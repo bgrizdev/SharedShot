@@ -14,12 +14,17 @@ function CreateEventContent() {
   const router = useRouter()
   const { user } = useAuth()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) return
-    
-    const event = addEvent(eventName, user.id)
-    router.push(`/events/${event.slug}`)
+
+    const event = await addEvent(eventName, user.id)
+    if (event) {
+      router.push(`/events/${event.slug}`)
+    } else {
+      // Handle error - could show a toast or error message
+      console.error('Failed to create event')
+    }
   }
 
   return (

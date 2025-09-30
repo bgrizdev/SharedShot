@@ -13,25 +13,22 @@ function MyEventsContent() {
   const { user } = useAuth()
 
   useEffect(() => {
-    if (!user) return
-
-    const userEvents = getUserEvents(user.id)
-    // Ensure all events have required properties (for backward compatibility)
-    const eventsWithDefaults = userEvents.map(event => ({
-      ...event,
-      images: event.images || [],
-      ownerId: event.ownerId || '',
-      collaborators: event.collaborators || [],
-      createdAt: event.createdAt || new Date().toISOString(),
-      isPublic: event.isPublic !== undefined ? event.isPublic : true
-    }))
-    setEvents(eventsWithDefaults)
+    const fetchEvents = async () => {
+      if (!user) return
+      
+      const userEvents = await getUserEvents(user.id)
+      setEvents(userEvents)
+    }
+    
+    fetchEvents()
   }, [user])
 
   const handleDeleteEvent = async (eventSlug: string, eventName: string) => {
     if (confirm(`Are you sure you want to delete "${eventName}"? This action cannot be undone.`)) {
       try {
-        // Delete all images for this event
+        if (!user) return
+        
+        // Delete all images for this event (API will handle file cleanup)
         await fetch('/api/delete-event-images', {
           method: 'DELETE',
           headers: {
@@ -40,19 +37,12 @@ function MyEventsContent() {
           body: JSON.stringify({ eventSlug }),
         })
 
-        // Delete event from local storage
-        deleteEvent(eventSlug)
-
-        // Refresh events list
-        if (user) {
-          const updatedEvents = getUserEvents(user.id).map(event => ({
-            ...event,
-            images: event.images || [],
-            ownerId: event.ownerId || '',
-            collaborators: event.collaborators || [],
-            createdAt: event.createdAt || new Date().toISOString(),
-            isPublic: event.isPublic !== undefined ? event.isPublic : true
-          }))
+        // Delete event from database
+        const success = await deleteEvent(eventSlug, user.id)
+        
+        if (success) {
+          // Refresh events list
+          const updatedEvents = await getUserEvents(user.id)
           setEvents(updatedEvents)
         }
       } catch (error) {
@@ -89,13 +79,13 @@ function MyEventsContent() {
                   <div className="mb-4">
                     <div className="aspect-video overflow-hidden rounded-md mb-2">
                       <img
-                        src={event.images[0]}
+                        src={event.images[0].url}
                         alt={`${event.name} preview`}
                         className="w-full h-full object-cover"
                       />
                     </div>
                     <p className="text-sm text-gray-600">
-                      {event.images?.length || 0} image{(event.images?.length || 0) > 1 ? 's' : ''}
+                      {event.images.length} image{event.images.length > 1 ? 's' : ''}
                     </p>
                   </div>
                 ) : (

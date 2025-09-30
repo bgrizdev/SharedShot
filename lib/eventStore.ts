@@ -1,149 +1,152 @@
-
-
 export type Event = {
   id: string
   name: string
   slug: string
-  images: string[]
   ownerId: string
-  collaborators: string[] // Array of user IDs who can add images
-  createdAt: string
-  isPublic: boolean // Whether the event can be viewed by anyone
+  isPublic: boolean
+  createdAt: Date
+  updatedAt: Date
+  images: EventImage[]
+  collaborators: EventCollaborator[]
+  owner: { id: string; name: string; email: string }
 }
 
-export function addEvent(name: string, ownerId: string): Event {
-  const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '')
-  const id = crypto.randomUUID()
-  const event = { 
-    id, 
-    name, 
-    slug, 
-    images: [], 
-    ownerId,
-    collaborators: [],
-    createdAt: new Date().toISOString(),
-    isPublic: true // Events are public by default for sharing
+export type EventImage = {
+  id: string
+  url: string
+  filename: string
+  createdAt: Date
+}
+
+export type EventCollaborator = {
+  id: string
+  user: { id: string; name: string; email: string }
+}
+
+export async function addEvent(name: string, ownerId: string): Promise<Event | null> {
+  try {
+    const response = await fetch('/api/events', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name, ownerId }),
+    })
+
+    const result = await response.json()
+
+    if (result.success) {
+      return result.event
+    }
+
+    return null
+  } catch (error) {
+    console.error('Error creating event:', error)
+    return null
   }
-
-  const existing = getAllEvents()
-  const updated = [...existing, event]
-  localStorage.setItem('events', JSON.stringify(updated))
-
-  return event
 }
 
-export function addImageToEvent(slug: string, imageUrl: string): boolean {
-  const events = getAllEvents()
-  const eventIndex = events.findIndex(e => e.slug === slug)
-  
-  if (eventIndex === -1) return false
-  
-  events[eventIndex].images.push(imageUrl)
-  localStorage.setItem('events', JSON.stringify(events))
-  return true
-}
+export async function getUserEvents(userId: string): Promise<Event[]> {
+  try {
+    const response = await fetch(`/api/events?userId=${userId}`)
+    const result = await response.json()
 
-export function addImagesToEvent(slug: string, imageUrls: string[]): boolean {
-  const events = getAllEvents()
-  const eventIndex = events.findIndex(e => e.slug === slug)
-  
-  if (eventIndex === -1) return false
-  
-  events[eventIndex].images.push(...imageUrls)
-  localStorage.setItem('events', JSON.stringify(events))
-  return true
-}
+    if (result.success) {
+      return result.events
+    }
 
-export function removeImageFromEvent(slug: string, imageUrl: string): boolean {
-  const events = getAllEvents()
-  const eventIndex = events.findIndex(e => e.slug === slug)
-  
-  if (eventIndex === -1) return false
-  
-  events[eventIndex].images = events[eventIndex].images.filter(url => url !== imageUrl)
-  localStorage.setItem('events', JSON.stringify(events))
-  return true
-}
-
-export function deleteEvent(slug: string): boolean {
-  const events = getAllEvents()
-  const filteredEvents = events.filter(e => e.slug !== slug)
-  
-  if (filteredEvents.length === events.length) return false // Event not found
-  
-  localStorage.setItem('events', JSON.stringify(filteredEvents))
-  return true
-}
-
-export function addCollaboratorToEvent(slug: string, userEmail: string): { success: boolean; error?: string } {
-  const events = getAllEvents()
-  const eventIndex = events.findIndex(e => e.slug === slug)
-  
-  if (eventIndex === -1) return { success: false, error: 'Event not found' }
-  
-  // Find user by email
-  const users = getAllUsers()
-  const user = users.find(u => u.email === userEmail)
-  
-  if (!user) return { success: false, error: 'User not found' }
-  
-  // Ensure collaborators array exists
-  if (!events[eventIndex].collaborators) {
-    events[eventIndex].collaborators = []
+    return []
+  } catch (error) {
+    console.error('Error fetching user events:', error)
+    return []
   }
-  
-  // Check if already a collaborator
-  if (events[eventIndex].collaborators.includes(user.id)) {
-    return { success: false, error: 'User is already a collaborator' }
-  }
-  
-  events[eventIndex].collaborators.push(user.id)
-  localStorage.setItem('events', JSON.stringify(events))
-  return { success: true }
 }
 
-export function removeCollaboratorFromEvent(slug: string, userId: string): boolean {
-  const events = getAllEvents()
-  const eventIndex = events.findIndex(e => e.slug === slug)
-  
-  if (eventIndex === -1) return false
-  
-  // Ensure collaborators array exists
-  if (!events[eventIndex].collaborators) {
-    events[eventIndex].collaborators = []
+export async function getEventBySlug(slug: string): Promise<Event | null> {
+  try {
+    const response = await fetch(`/api/events/${slug}`)
+    const result = await response.json()
+
+    if (result.success) {
+      return result.event
+    }
+
+    return null
+  } catch (error) {
+    console.error('Error fetching event:', error)
+    return null
   }
-  
-  events[eventIndex].collaborators = events[eventIndex].collaborators.filter(id => id !== userId)
-  localStorage.setItem('events', JSON.stringify(events))
-  return true
+}
+
+export async function addImagesToEvent(slug: string, imageUrls: string[]): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/events/${slug}/images`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ imageUrls }),
+    })
+
+    const result = await response.json()
+    return result.success
+  } catch (error) {
+    console.error('Error adding images to event:', error)
+    return false
+  }
+}
+
+export async function removeImageFromEvent(slug: string, imageUrl: string): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/events/${slug}/images`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ imageUrl }),
+    })
+
+    const result = await response.json()
+    return result.success
+  } catch (error) {
+    console.error('Error removing image from event:', error)
+    return false
+  }
+}
+
+export async function deleteEvent(slug: string, userId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/events/${slug}?userId=${userId}`, {
+      method: 'DELETE',
+    })
+
+    const result = await response.json()
+    return result.success
+  } catch (error) {
+    console.error('Error deleting event:', error)
+    return false
+  }
+}
+
+export async function addCollaboratorToEvent(slug: string, userEmail: string, requesterId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch(`/api/events/${slug}/collaborators`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userEmail, requesterId }),
+    })
+
+    const result = await response.json()
+    return result
+  } catch (error) {
+    console.error('Error adding collaborator:', error)
+    return { success: false, error: 'Failed to add collaborator' }
+  }
 }
 
 export function canUserEditEvent(event: Event, userId: string | null): boolean {
   if (!userId) return false
-  return event.ownerId === userId || (event.collaborators && event.collaborators.includes(userId))
-}
-
-export function getUserEvents(userId: string): Event[] {
-  const allEvents = getAllEvents()
-  return allEvents.filter(event => 
-    event.ownerId === userId || (event.collaborators && event.collaborators.includes(userId))
-  )
-}
-
-// Import getAllUsers function (we need to add this)
-function getAllUsers(): any[] {
-  if (typeof window === 'undefined') return []
-  const raw = localStorage.getItem('users')
-  return raw ? JSON.parse(raw) : []
-}
-
-export function getAllEvents(): Event[] {
-  if (typeof window === 'undefined') return []
-  const raw = localStorage.getItem('events')
-  return raw ? JSON.parse(raw) : []
-}
-
-export function getEventBySlug(slug: string): Event | undefined {
-  const all = getAllEvents()
-  return all.find((e) => e.slug === slug)
+  return event.ownerId === userId || event.collaborators.some(collab => collab.user.id === userId)
 }
